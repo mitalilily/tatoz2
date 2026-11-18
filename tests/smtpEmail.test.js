@@ -58,3 +58,9 @@ test('queued transactional email keeps active Brevo and otherwise selects config
   await expect(emailService.queuedEmailProvider('tenant-b')).resolves.toBe('smtp');
   expect(configFor.mock.calls).toEqual([['tenant-a', 'brevo'], ['tenant-b', 'brevo'], ['tenant-b', 'smtp']]);
 });
+
+test('the invoice delivery service retains the existing provider defaults', () => {
+  const { providerFor } = require('../services/invoiceDeliveryService');
+  expect(providerFor('email')).toBe('brevo');
+  expect(providerFor('whatsapp')).toBe('wati');
+});
