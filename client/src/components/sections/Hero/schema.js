@@ -1,0 +1,28 @@
+export const heroLabel = 'Hero / Slideshow';
+export const heroDefaults = () => ({
+  variant: 'classic',
+  aspectRatio: '2.15/1',
+  customHeight: { value: 60, unit: 'vh' },
+  transition: 'fade',
+  showArrows: true,
+  showDots: true,
+  autoplay: true,
+  intervalMs: 5000,
+  stripHeight: { value: 400, unit: 'px' },
+  stripGap: { value: 8, unit: 'px' },
+  stripSpeed: 40,
+  stripDirection: 'left',
+  stripPauseOnHover: true,
+  slides: [{
+    imageUrl: '',
+    headline: 'Big headline here',
+    subheadline: 'Subheadline copy',
+    ctaLabel: 'Shop now',
+    ctaLink: '/',
+    alignment: 'center',
+    overlayOpacity: 0.4,
+    bgColor: '',
+    textColor: '',
+    imagePosition: 'left',
+  }],
+});
