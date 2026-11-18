@@ -106,9 +106,9 @@ const requireOtpQualified = asyncHandler(async (req, res, next) => {
   if (authSessionService.isOtpQualified(req.authSession, req.tenant?._id)) return next();
   const isOrder = String(req.originalUrl || '').startsWith('/api/orders');
   await securityEventService.recordOtpGateDenied(req, otpDenialReason(req.authSession, req.tenant?._id));
-  const error = new Error(isOrder
-    ? 'Verify your phone number before placing an order'
-    : 'Verify your phone number before changing the cart');
+  const identity = policy.cartOtpProvider === 'email' ? 'email address' : 'phone number';
+  const action = isOrder ? 'placing an order' : 'changing the cart';
+  const error = new Error(`Verify your ${identity} before ${action}`);
   error.statusCode = 403;
   error.publicCode = 'OTP_VERIFICATION_REQUIRED';
   next(error);

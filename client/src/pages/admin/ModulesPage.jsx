@@ -9,6 +9,7 @@ import {
   KeyRound,
   LockKeyhole,
   MessageCircle,
+  Mail,
   PlugZap,
   Save,
   Search,
@@ -297,6 +298,9 @@ const ModulesPage = () => {
   const [configBusy, setConfigBusy] = useState('');
   const [canManage, setCanManage] = useState(false);
   const [query, setQuery] = useState('');
+  const [cartVerification, setCartVerification] = useState('disabled');
+  const [testRecipient, setTestRecipient] = useState('');
+  const [sendingTest, setSendingTest] = useState(false);
 
   const integrationById = useMemo(() => Object.fromEntries(integrations.map(item => [normalize(item.id), item])), [integrations]);
 
@@ -309,6 +313,7 @@ const ModulesPage = () => {
       setCanManage(Boolean(planeResponse.data?.canManage));
       setIntegrations(integrationResponse.data?.integrations || []);
       setAuthMethods(plane?.authentication?.activeMethods || []);
+      setCartVerification(plane?.authentication?.cartOtpProvider || 'disabled');
       setShippingProvider(plane?.shipping?.activeProvider || '');
       setPaymentProviders(plane?.payment?.activeProviders || []);
     } catch (error) {
@@ -323,6 +328,7 @@ const ModulesPage = () => {
     if (!plane) return;
     setControlPlane(plane);
     setAuthMethods(plane.authentication?.activeMethods || []);
+    setCartVerification(plane.authentication?.cartOtpProvider || 'disabled');
     setShippingProvider(plane.shipping?.activeProvider || '');
     setPaymentProviders(plane.payment?.activeProviders || []);
   };
@@ -348,6 +354,30 @@ const ModulesPage = () => {
       toast.success(shippingProvider ? 'Shipping partner activated platform-wide' : 'Manual shipping mode activated');
     } catch (error) { toast.error(error.message || 'Could not activate shipping partner'); await load(); }
     finally { setSaving(''); }
+  };
+
+  const saveCartVerification = async () => {
+    if (!canManage) return;
+    setSaving('cart');
+    try {
+      await adminAPI.updateAuthPolicy({ cartOtpProvider: cartVerification });
+      toast.success('Cart verification updated');
+      await load();
+    } catch (error) {
+      toast.error(error.message || 'Could not update cart verification');
+    } finally { setSaving(''); }
+  };
+
+  const sendTestEmail = async event => {
+    event.preventDefault();
+    if (!canManage || sendingTest || !testRecipient.trim()) return;
+    setSendingTest(true);
+    try {
+      const response = await adminAPI.sendSmtpTestEmail(testRecipient.trim());
+      toast.success(response.data?.message || 'SMTP accepted the test email');
+    } catch (error) {
+      toast.error(error.message || 'Could not send the test email');
+    } finally { setSendingTest(false); }
   };
 
   const savePayment = async () => {
@@ -428,6 +458,7 @@ const ModulesPage = () => {
   const authPolicy = controlPlane.authentication || {};
   const authPrimaryMode = authPrimary || authPolicy.primaryMode || '';
   const cartOtpProvider = authPolicy.cartOtpProvider || 'disabled';
+  const smtp = integrationById.smtp;
 
   const readyCount = [...(controlPlane.authentication?.providers || []), ...(controlPlane.shipping?.providers || []), ...(controlPlane.payment?.providers || [])]
     .filter(card => card?.operational || card?.available).length;
@@ -620,6 +651,59 @@ const ModulesPage = () => {
         )}
       </SectionShell>
 
+      {smtp && (
+        <section id="email" className="scroll-mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <Mail size={20} className="mt-0.5 text-slate-700" />
+              <div>
+                <h2 className="text-base font-semibold text-slate-900">Transactional email</h2>
+                <p className="mt-1 text-xs text-slate-600">
+                  {smtp.operational ? 'SMTP is enabled.' : 'Configure and verify the mailbox used to send emails.'}
+                </p>
+              </div>
+            </div>
+            {canManage && (
+              <button type="button" onClick={() => openConfigure('smtp')} className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-800">
+                Configure SMTP
+              </button>
+            )}
+          </div>
+          {canManage && smtp.operational && (
+            <form onSubmit={sendTestEmail} className="mt-4 flex flex-wrap items-end gap-3">
+              <label className="block flex-1 text-xs font-semibold text-slate-700">
+                Test recipient
+                <input type="email" required maxLength={160} value={testRecipient} onChange={event => setTestRecipient(event.target.value)}
+                  className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal"
+                  placeholder="you@example.com" />
+              </label>
+              <button type="submit" disabled={sendingTest || !testRecipient.trim()} className="rounded-lg bg-slate-950 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">
+                {sendingTest ? 'Sending…' : 'Send test email'}
+              </button>
+            </form>
+          )}
+          <div className="mt-5 border-t border-slate-100 pt-4">
+            <label htmlFor="cart-verification-method" className="text-xs font-semibold text-slate-700">Cart verification</label>
+            <div className="mt-1 flex flex-wrap gap-2">
+              <select id="cart-verification-method" value={cartVerification} disabled={!canManage || Boolean(saving)}
+                onChange={event => setCartVerification(event.target.value)} className="min-w-44 rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                {(authPolicy.cartOtpProviders || []).map(provider => (
+                  <option key={provider.id} value={provider.id} disabled={!provider.available && provider.id !== cartOtpProvider}>
+                    {provider.label}{!provider.available ? ' (setup required)' : ''}
+                  </option>
+                ))}
+              </select>
+              {canManage && (
+                <button type="button" onClick={saveCartVerification} disabled={cartVerification === cartOtpProvider || Boolean(saving)}
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold disabled:opacity-50">
+                  {saving === 'cart' ? 'Saving…' : 'Save cart verification'}
+                </button>
+              )}
+            </div>
+            <p className="mt-2 text-xs text-slate-600">Email OTP requires shoppers to sign in and verify their email before using the cart.</p>
+          </div>
+        </section>
+      )}
       <div className="flex items-start gap-2.5 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-[11px] leading-5 text-slate-600 shadow-sm">
         <LockKeyhole size={13} className="mt-0.5 flex-shrink-0 text-slate-400" />
         <span>Sidebar links follow the active selections. A provider becomes selectable only after its credentials pass the server-side connection test.</span>

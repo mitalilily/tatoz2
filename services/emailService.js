@@ -1,64 +1,51 @@
-const nodemailer = require('nodemailer');
 const { getProviderConfig } = require('./integrationService');
 const tenantIntegrationService = require('./tenantIntegrationService');
+const { findPlatformTenant } = require('./tenantService');
+const smtp = require('./integrations/smtpAdapter');
 const { PLATFORM_NAME } = require('../constants/branding');
 
-let transporter = null;
-let transporterSignature = '';
-
-const getTransporter = config => {
-  const signature = [config.host, config.port, config.secure, config.user, config.pass].join('|');
-  if (!transporter || transporterSignature !== signature) {
-    transporter = nodemailer.createTransport({
-      host: config.host,
-      port: Number(config.port) || 587,
-      secure: Boolean(config.secure),
-      auth: { user: config.user, pass: config.pass },
-    });
-    transporterSignature = signature;
-  }
-  return transporter;
+const smtpConfigFor = async tenantId => {
+  const scope = tenantId || (await findPlatformTenant())?._id;
+  return scope ? tenantIntegrationService.configFor(scope, 'smtp') : getProviderConfig('smtp');
 };
 
-const sendEmail = async ({ to, subject, html, text }) => {
-  const config = await getProviderConfig('smtp');
-  if (!config.enabled || !config.user || !config.pass || !config.host) {
-    console.log(`Email skipped (not configured): ${subject} to ${to}`);
-    return;
-  }
+// Keep an existing Brevo setup for queued messages. SMTP can handle
+// transactional delivery for tenants that have only a mailbox configured.
+const queuedEmailProvider = async tenantId => {
+  const brevo = await tenantIntegrationService.configFor(tenantId, 'brevo');
+  if (brevo.enabled) return 'brevo';
+  return smtp.isConfigured(await smtpConfigFor(tenantId)) ? 'smtp' : 'brevo';
+};
+
+const sendEmail = async ({ tenantId, to, subject, html, text }) => {
+  if (!to) return;
   try {
-    await getTransporter(config).sendMail({
-      from: config.from || config.user,
-      to,
-      subject,
-      html,
-      text: text || html.replace(/<[^>]+>/g, ''),
-    });
+    const config = await smtpConfigFor(tenantId);
+    if (smtp.isConfigured(config)) return await smtp.sendEmail({ to, subject, html, text }, config);
   } catch (err) {
-    console.error('Email error:', err.message);
+    console.error('Email delivery failed:', err.code || err.name);
   }
 };
 
-const sendVerificationOtp = async ({ tenantId, to, otp }) => {
-  const config = await tenantIntegrationService.configFor(tenantId, 'smtp', { allowPlatformFallback: true });
-  if (!config.enabled || !config.user || !config.pass || !config.host || !config.from) {
+const sendVerificationOtp = async ({ tenantId, to, otp, config }) => {
+  const mailConfig = config || await smtpConfigFor(tenantId);
+  if (!smtp.isConfigured(mailConfig) || !mailConfig.from) {
     const error = new Error('Email verification is not configured');
     error.statusCode = 503;
     error.publicCode = 'OTP_PROVIDER_UNAVAILABLE';
     throw error;
   }
-  await getTransporter(config).sendMail({
-    from: config.from || config.user,
+  return smtp.sendEmail({
     to,
     subject: `Your ${PLATFORM_NAME} cart verification code`,
     html: `<div style="font-family:sans-serif;max-width:560px;margin:0 auto"><h2>Verify your cart</h2><p>Use this one-time code to continue:</p><p style="font-size:32px;font-weight:700;letter-spacing:8px">${String(otp)}</p><p>This code expires in 10 minutes. If you did not request it, you can ignore this email.</p></div>`,
     text: `Your ${PLATFORM_NAME} cart verification code is ${String(otp)}. It expires in 10 minutes.`,
-  });
-  return { status: 'sent' };
+  }, mailConfig);
 };
 
 const sendOrderConfirmation = async (order, user) => {
   await sendEmail({
+    tenantId: order.tenant,
     to: user.email,
     subject: `Order Confirmed - #${order.orderNumber} | ${PLATFORM_NAME}`,
     html: `
@@ -93,8 +80,9 @@ const sendPasswordReset = async (user, resetUrl) => {
   });
 };
 
-const sendWelcome = async (user) => {
+const sendWelcome = async (user, tenantId) => {
   await sendEmail({
+    tenantId,
     to: user.email,
     subject: `Welcome to ${PLATFORM_NAME}!`,
     html: `
@@ -107,4 +95,4 @@ const sendWelcome = async (user) => {
   });
 };
 
-module.exports = { sendEmail, sendVerificationOtp, sendOrderConfirmation, sendPasswordReset, sendWelcome };
+module.exports = { sendEmail, sendVerificationOtp, sendOrderConfirmation, sendPasswordReset, sendWelcome, smtpConfigFor, queuedEmailProvider };

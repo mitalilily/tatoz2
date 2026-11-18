@@ -7,10 +7,10 @@ const tenantIntegrationService = require('./tenantIntegrationService');
 const { getAdapter } = require('./integrations/providerRegistry');
 const { enqueue } = require('./outboxService');
 const { isChannelAllowed } = require('./notificationDeliveryService');
+const { queuedEmailProvider } = require('./emailService');
 require('./integrations/registerBuiltins');
 
 const tenantIdOf = tenant => tenant?._id || tenant || null;
-const providerFor = channel => channel === 'email' ? 'brevo' : channel === 'whatsapp' ? 'wati' : null;
 const deliveryError = (message, statusCode = 400, publicCode = 'INVOICE_DELIVERY_ERROR') => {
   const error = new Error(message);
   error.statusCode = statusCode;
@@ -50,9 +50,8 @@ const maskRecipient = value => {
 
 const queueInvoiceDelivery = async ({ tenant, invoiceId, noteId, channel, idempotencyKey, requestedBy } = {}) => {
   const tenantId = tenantIdOf(tenant);
-  const provider = providerFor(channel);
   if (!tenantId) throw deliveryError('Tenant context is required', 400, 'TENANT_REQUIRED');
-  if (!provider) throw deliveryError('Invoice delivery channel must be email or whatsapp', 400, 'INVOICE_CHANNEL_INVALID');
+  if (!['email', 'whatsapp'].includes(channel)) throw deliveryError('Invoice delivery channel must be email or whatsapp', 400, 'INVOICE_CHANNEL_INVALID');
   const key = String(idempotencyKey || '').trim();
   if (!/^[A-Za-z0-9:_-]{8,128}$/.test(key)) throw deliveryError('A valid Idempotency-Key is required', 400, 'IDEMPOTENCY_KEY_REQUIRED');
   const source = await sourceDocument({ tenant: tenantId, invoiceId, noteId });
@@ -71,6 +70,7 @@ const queueInvoiceDelivery = async ({ tenant, invoiceId, noteId, channel, idempo
     return { delivery: existing, idempotent: true };
   }
   const eventType = `invoice.document.${channel}`;
+  const provider = channel === 'email' ? await queuedEmailProvider(tenantId) : 'wati';
   const delivery = await InvoiceDelivery.create({
     tenant: tenantId,
     ...(source.kind === 'invoice' ? { invoice: source.document._id } : { note: source.document._id }),

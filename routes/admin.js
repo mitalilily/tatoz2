@@ -9,6 +9,7 @@ const { convertToWebp } = require('../middleware/convertToWebp');
 const adminVendorRoutes = require('./adminVendor');
 const { requireActiveProvider, requireActiveProviderParam } = require('../middleware/activeProvider');
 const adminStorageController = require('../controllers/adminStorageController');
+const { strictLimiter } = require('../middleware/rateLimiter');
 
 // Admin middleware applied to all routes
 router.use(protect, loadTenantOptional, loadAdminTenantScope, admin, enforceTenantPermission);
@@ -23,6 +24,7 @@ const integrations = require('../controllers/integrationController');
 router.get('/integrations', integrations.getIntegrations);
 router.put('/integrations/:provider', superAdmin, integrations.updateIntegration);
 router.post('/integrations/:provider/test', superAdmin, integrations.testIntegration);
+router.post('/integrations/smtp/test-email', superAdmin, strictLimiter, integrations.sendSmtpTestEmail);
 router.delete('/integrations/:provider', superAdmin, integrations.clearIntegration);
 
 // Feature/module switches are separate from encrypted provider credentials.

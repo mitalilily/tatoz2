@@ -463,6 +463,7 @@ export const adminAPI = {
   getIntegrations: () => API.get('/admin/integrations'),
   updateIntegration: (provider, data) => API.put(`/admin/integrations/${provider}`, data),
   testIntegration: (provider, data = {}) => API.post(`/admin/integrations/${provider}/test`, data),
+  sendSmtpTestEmail: to => API.post('/admin/integrations/smtp/test-email', { to }),
   clearIntegration: provider => API.delete(`/admin/integrations/${provider}`),
   getTenantIntegrations: () => API.get('/tenant/integrations'),
   updateTenantIntegration: (provider, data) => API.put(`/tenant/integrations/${provider}`, data),

@@ -118,6 +118,7 @@ const triggerPriceDropAlerts = async (productId, { tenantId, previousPrice, curr
     });
     if (alert.email) {
       await sendEmail({
+        tenantId,
         to: alert.email,
         subject: `${product.title} price dropped — ${siteName}`,
         html: `<p><strong>${product.title}</strong> is now available at ₹${Number(currentPrice).toFixed(2)} (was ₹${Number(alert.baselinePrice).toFixed(2)}).</p><p><a href="${clientUrl}/product/${product.slug}">Shop now</a></p>`,

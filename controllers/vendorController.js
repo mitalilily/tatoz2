@@ -129,6 +129,7 @@ const registerVendor = asyncHandler(async (req, res) => {
   // Notify admin via email
   if (contactEmail) try {
     await sendEmail({
+      tenantId: vendor.tenant,
       to: process.env.ADMIN_EMAIL,
       subject: `New vendor registration: ${storeName}`,
       html: `<p>A new vendor has registered: <strong>${storeName}</strong></p>

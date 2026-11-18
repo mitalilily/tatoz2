@@ -230,7 +230,7 @@ const setPolicy = async (tenant, payload = {}, updatedBy) => {
 
   const current = await getEffectivePolicy(tenant._id);
   const hasMethods = Object.prototype.hasOwnProperty.call(payload, 'activeMethods') || Object.prototype.hasOwnProperty.call(payload, 'methods');
-  const requestedMethods = normalizeMethods(hasMethods ? (payload.activeMethods || payload.methods) : (payload.primaryMode || payload.mode || current.primaryMode));
+  const requestedMethods = normalizeMethods(hasMethods ? (payload.activeMethods || payload.methods) : (payload.primaryMode || payload.mode || current.activeMethods));
   if (hasMethods && !requestedMethods.length) {
     const error = new Error('Select at least one authentication method');
     error.statusCode = 400;

@@ -7,6 +7,7 @@ const tenantIntegrationService = require('./tenantIntegrationService');
 const { getAdapter } = require('./integrations/providerRegistry');
 const { enqueue } = require('./outboxService');
 const msg91Service = require('./msg91Service');
+const { queuedEmailProvider } = require('./emailService');
 
 const channelProvider = { whatsapp: 'wati', push: 'fcm', email: 'brevo', sms: 'msg91' };
 
@@ -31,14 +32,15 @@ const isChannelAllowed = async ({ tenant, userId, channel, purpose = 'transactio
 
 const send = async ({ tenant, channel, recipient, userId, purpose = 'transactional', eventType, idempotencyKey, templateName, parameters, title, body, data, email, subject, html }) => {
   if (!tenant) throw new Error('Tenant is required for notifications');
-  const selected = channel === 'sms' ? await resolveSmsProvider(tenant) : { id: channelProvider[channel], config: null };
-  const provider = selected.id;
+  let provider = channelProvider[channel];
   if (!provider) throw new Error(`Unsupported notification channel: ${channel}`);
   if (userId) {
     const allowed = await isChannelAllowed({ tenant, userId, channel, purpose });
     if (!allowed) throw new Error(`Recipient has disabled or not consented to ${channel} ${purpose} messages`);
     if (channel === 'push' && recipient) await DeviceToken.findOneAndUpdate({ tenant, token: recipient }, { $set: { user: userId, lastSeenAt: new Date(), invalidatedAt: null } }, { upsert: true, new: true });
   }
+  if (channel === 'sms') provider = (await resolveSmsProvider(tenant)).id;
+  if (channel === 'email' && purpose !== 'marketing') provider = await queuedEmailProvider(tenant);
   const key = idempotencyKey || crypto.createHash('sha256').update(`${tenant}:${provider}:${eventType}:${recipient || email}`).digest('hex');
   const delivery = await IntegrationDelivery.findOneAndUpdate(
     { tenant, provider, idempotencyKey: key },
@@ -70,7 +72,7 @@ const process = async ({ deliveryId, tenant, channel, provider: requestedProvide
     else if (provider === 'msg91') result = await msg91Service.sendSMS(recipient, { tenantId: tenant, parameters, message: body });
     else if (provider === 'trustsignal') result = await adapter.sendSms({ phone: recipient, message: body, templateId: templateName, options: parameters }, config);
     else if (provider === 'fcm') result = await adapter.send({ token: recipient, title, body, data }, config);
-    else result = await adapter.sendEmail({ to: email || recipient, subject, html, sender: config.sender_email ? { email: config.sender_email } : undefined }, config);
+    else result = await adapter.sendEmail({ to: email || recipient, subject, html, text: body, sender: config.sender_email ? { email: config.sender_email } : undefined }, config);
     await IntegrationDelivery.updateOne({ _id: delivery._id }, { $set: { status: result.status === 'failed' ? 'failed' : 'sent', externalId: result.externalId || '', response: result.raw || {}, sentAt: new Date(), error: result.status === 'failed' ? 'Provider rejected delivery' : '' } });
     return result;
   } catch (error) {

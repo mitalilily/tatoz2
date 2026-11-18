@@ -188,7 +188,7 @@ const register = asyncHandler(async (req, res) => {
 
   try {
     const user = await User.create({ name, email, password, role: 'customer' });
-    await sendWelcome(user).catch(() => {});
+    await sendWelcome(user, req.tenant?._id).catch(() => {});
     require('../services/orderNotificationService').sendWelcomeSms({ user, tenant: req.tenant?._id }).catch(error => console.error('[TrustSignal] welcome SMS hook failed:', error.message));
     return sendTokenResponse(user, 201, res, true, {}, { method: 'password', otpVerified: false });
   } catch (error) {
@@ -508,7 +508,7 @@ const googleAuth = asyncHandler(async (req, res) => {
         avatar: picture || '',
         isEmailVerified: true,
       });
-      await sendWelcome(user).catch(() => {});
+      await sendWelcome(user, req.tenant?._id).catch(() => {});
     } catch (err) {
       // Race: another request created the user in between — re-fetch and log in.
       if (!isDuplicateKey(err, 'email') && !isDuplicateKey(err, 'googleId')) throw err;

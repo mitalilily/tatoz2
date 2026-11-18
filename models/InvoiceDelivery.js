@@ -6,7 +6,7 @@ const invoiceDeliverySchema = new mongoose.Schema({
   note: { type: mongoose.Schema.Types.ObjectId, ref: 'InvoiceNote', index: true },
   order: { type: mongoose.Schema.Types.ObjectId, ref: 'Order', required: true, index: true },
   channel: { type: String, enum: ['email', 'whatsapp'], required: true },
-  provider: { type: String, enum: ['brevo', 'wati'], required: true },
+  provider: { type: String, enum: ['brevo', 'smtp', 'wati'], required: true },
   recipient: { type: String, required: true, select: false },
   recipientMasked: { type: String, default: '' },
   status: { type: String, enum: ['queued', 'processing', 'sent', 'delivered', 'failed', 'dead_letter'], default: 'queued', index: true },

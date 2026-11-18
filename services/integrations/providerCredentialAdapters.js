@@ -1,19 +1,8 @@
 const httpRequest = require('../../utils/httpRequest');
-const nodemailer = require('nodemailer');
+const smtp = require('./smtpAdapter');
 
 const assert = (condition, message) => {
   if (!condition) throw new Error(message);
-};
-
-const smtp = {
-  activation: 'credential-test',
-  contractMethods: ['testConnection'],
-  async testConnection(config) {
-    assert(config.host && config.user && config.pass, 'SMTP host, username and password are required');
-    const transporter = nodemailer.createTransport({ host: text(config.host), port: Number(config.port) || 587, secure: Boolean(config.secure), auth: { user: text(config.user), pass: text(config.pass) } });
-    await transporter.verify();
-    return { success: true, message: 'SMTP server is reachable' };
-  },
 };
 
 const text = value => String(value || '').trim();

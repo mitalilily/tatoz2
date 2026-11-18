@@ -185,6 +185,7 @@ const approveVendor = asyncHandler(async (req, res) => {
 
   try {
     await sendEmail({
+      tenantId: vendor.tenant,
       to: vendor.contactEmail,
       subject: `🎉 Your store "${vendor.storeName}" is approved!`,
       html: `<p>Congratulations! Your store <strong>${vendor.storeName}</strong> has been approved.</p>
@@ -226,6 +227,7 @@ const rejectVendor = asyncHandler(async (req, res) => {
 
   try {
     await sendEmail({
+      tenantId: vendor.tenant,
       to: vendor.contactEmail,
       subject: `Update on your "${vendor.storeName}" application`,
       html: `<p>Thank you for your interest in selling on ${PLATFORM_NAME}.</p>

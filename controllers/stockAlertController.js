@@ -159,7 +159,7 @@ const triggerStockAlerts = async (productId) => {
       }
 
       const emailAllowed = Boolean(alert.email) && (!alert.user || await isChannelAllowed({ tenant: product.tenant, userId: alert.user, channel: 'email', purpose: 'transactional' }));
-      if (emailAllowed) await sendEmail({ to: alert.email, subject, html });
+      if (emailAllowed) await sendEmail({ tenantId: product.tenant, to: alert.email, subject, html });
       alert.notified = true;
       alert.notifiedAt = new Date();
       alert.delivery = { inApp, email: emailAllowed, emailSkipped: Boolean(alert.email) && !emailAllowed };

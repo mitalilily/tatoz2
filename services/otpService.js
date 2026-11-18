@@ -90,7 +90,7 @@ const send = async ({ phone, email, tenantId, purpose = 'login', authMethod }) =
   if (provider.id === 'email') {
     if (!email) throw new Error('An email address is required for cart verification');
     const code = randomCode();
-    await emailService.sendVerificationOtp({ tenantId, to: email, otp: code });
+    await emailService.sendVerificationOtp({ tenantId, to: email, otp: code, config: provider.config });
     await saveChallenge({ tenantId, email, channel: 'email', purpose, code });
     return { provider: 'email', status: 'sent' };
   }
