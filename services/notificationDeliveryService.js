@@ -40,7 +40,7 @@ const send = async ({ tenant, channel, recipient, userId, purpose = 'transaction
     if (channel === 'push' && recipient) await DeviceToken.findOneAndUpdate({ tenant, token: recipient }, { $set: { user: userId, lastSeenAt: new Date(), invalidatedAt: null } }, { upsert: true, new: true });
   }
   if (channel === 'sms') provider = (await resolveSmsProvider(tenant)).id;
-  if (channel === 'email' && purpose !== 'marketing') provider = await queuedEmailProvider(tenant);
+  if (channel === 'email') provider = await queuedEmailProvider(tenant);
   const key = idempotencyKey || crypto.createHash('sha256').update(`${tenant}:${provider}:${eventType}:${recipient || email}`).digest('hex');
   const delivery = await IntegrationDelivery.findOneAndUpdate(
     { tenant, provider, idempotencyKey: key },

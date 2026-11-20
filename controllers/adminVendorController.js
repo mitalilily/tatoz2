@@ -186,11 +186,11 @@ const approveVendor = asyncHandler(async (req, res) => {
   try {
     await sendEmail({
       tenantId: vendor.tenant,
-      to: vendor.contactEmail,
+      to: vendor.contactEmail || vendor.owner?.email,
       subject: `🎉 Your store "${vendor.storeName}" is approved!`,
       html: `<p>Congratulations! Your store <strong>${vendor.storeName}</strong> has been approved.</p>
              <p>You can now log in and start listing your products.</p>
-             <p><a href="${process.env.CLIENT_URL}/vendor/dashboard">Go to your dashboard</a></p>`,
+             <p><a href="${process.env.SELLER_URL || process.env.CLIENT_URL}/vendor/dashboard">Go to your dashboard</a></p>`,
     });
   } catch (e) { /* non-fatal */ }
 
@@ -201,7 +201,7 @@ const approveVendor = asyncHandler(async (req, res) => {
 // @route   PUT /api/admin/vendors/:id/reject
 const rejectVendor = asyncHandler(async (req, res) => {
   const { reason, reasonCode = '' } = req.body || {};
-  const vendor = await Vendor.findOne(scopedVendor(req, { _id: req.params.id }));
+  const vendor = await Vendor.findOne(scopedVendor(req, { _id: req.params.id })).populate('owner', 'email');
   if (!vendor) { res.status(404); throw new Error('Vendor not found'); }
 
   vendor.status = 'rejected';
@@ -228,7 +228,7 @@ const rejectVendor = asyncHandler(async (req, res) => {
   try {
     await sendEmail({
       tenantId: vendor.tenant,
-      to: vendor.contactEmail,
+      to: vendor.contactEmail || vendor.owner?.email,
       subject: `Update on your "${vendor.storeName}" application`,
       html: `<p>Thank you for your interest in selling on ${PLATFORM_NAME}.</p>
              <p>Unfortunately, your application for <strong>${vendor.storeName}</strong> could not be approved at this time.</p>

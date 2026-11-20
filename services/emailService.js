@@ -9,11 +9,9 @@ const smtpConfigFor = async tenantId => {
   return scope ? tenantIntegrationService.configFor(scope, 'smtp') : getProviderConfig('smtp');
 };
 
-// Keep an existing Brevo setup for queued messages. SMTP can handle
-// transactional delivery for tenants that have only a mailbox configured.
+// All email channels use the same saved mailbox when SMTP is enabled.
+// Brevo remains the fallback for tenants without an SMTP connection.
 const queuedEmailProvider = async tenantId => {
-  const brevo = await tenantIntegrationService.configFor(tenantId, 'brevo');
-  if (brevo.enabled) return 'brevo';
   return smtp.isConfigured(await smtpConfigFor(tenantId)) ? 'smtp' : 'brevo';
 };
 
